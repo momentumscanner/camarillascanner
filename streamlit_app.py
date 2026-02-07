@@ -37,7 +37,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def generate_excel(df, today_filename):
+def generate_excel(df, today_filename, top_n=5):
     """
     Generates the Excel report in memory and returns the BytesIO object.
     Preserves the formatting logic from the desktop app.
@@ -221,15 +221,15 @@ def generate_excel(df, today_filename):
             column_letter = worksheet_lower.cell(row=2, column=col_idx).column_letter
             worksheet_lower.column_dimensions[column_letter].width = max_len
 
-        # Sheet 6: Top 5 Output
+        # Sheet 6: Top N Output
         metrics = [
-            ('OpnIntrst', 'Top 5 Open Interest'),
-            ('ChngInOpnIntrst', 'Top 5 Change in OI'),
-            ('TtlTradgVol', 'Top 5 Volume'),
-            ('TtlNbOfTxsExctd', 'Top 5 Transactions')
+            ('OpnIntrst', f'Top {top_n} Open Interest'),
+            ('ChngInOpnIntrst', f'Top {top_n} Change in OI'),
+            ('TtlTradgVol', f'Top {top_n} Volume'),
+            ('TtlNbOfTxsExctd', f'Top {top_n} Transactions')
         ]
         
-        sheet_name_top5 = 'Top 5 Output'
+        sheet_name_top5 = f'Top {top_n} Output'
         workbook.create_sheet(sheet_name_top5)
         worksheet_top5 = workbook[sheet_name_top5]
         
@@ -239,10 +239,11 @@ def generate_excel(df, today_filename):
         for metric, title in metrics:
             df[metric] = pd.to_numeric(df[metric], errors='coerce').fillna(0)
             
-            top5_df = df.sort_values(by=metric, ascending=False).head(5).copy()
+            top5_df = df.sort_values(by=metric, ascending=False).head(top_n).copy()
             
             cols_top5 = ['Symbol', 'Option_Type', 'ATM_Strike', 'Spot_Close', metric]
             top5_display = top5_df[cols_top5].copy()
+
             
             top5_display.to_excel(writer, sheet_name=sheet_name_top5, index=False, startrow=start_row, startcol=current_col)
             
@@ -281,6 +282,16 @@ with col2:
     st.subheader("Yesterday's Data")
     yest_file = st.file_uploader("Upload Yesterday's Bhav Copy (ZIP)", type=['zip'], key='yest')
 
+# Option for Top N Results
+st.markdown("### Report Settings")
+top_n_choice = st.radio(
+    "Select Number of Top Results to Display:",
+    options=[5, 10],
+    index=0,
+    horizontal=True,
+    help="Choose whether to see Top 5 or Top 10 results in the generated Excel report."
+)
+
 if st.button("SCAN & GENERATE REPORT"):
     if today_file is not None and yest_file is not None:
         try:
@@ -310,7 +321,7 @@ if st.button("SCAN & GENERATE REPORT"):
                     output_filename = f"Camarilla Scanner {date_str}.xlsx"
                     
                     # Generate Excel
-                    excel_data = generate_excel(df, today_filename)
+                    excel_data = generate_excel(df, today_filename, top_n_choice)
                     
                     st.success(f"Scan Complete! Found {len(df)} records.")
                     
